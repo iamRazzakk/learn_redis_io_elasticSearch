@@ -4,41 +4,53 @@ export const redisSet = async <T>(
   key: string,
   value: T,
   ttl: number = 60,
-  query: Record<string, any>
+  query: Record<string, any> = {},
 ) => {
   const queryString = new URLSearchParams(
-    query as Record<string, string>
+    Object.entries(query)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, String(v)]),
   ).toString();
   const result = await redisClient.set(
-    `${key}?${queryString}`,
+    queryString ? `${key}?${queryString}` : key,
     JSON.stringify(value),
     "EX",
-    ttl
+    ttl,
   );
   return result;
 };
 
-export const redisGet = async (key: string, query: Record<string, any>) => {
+export const redisGet = async <T>(
+  key: string,
+  query: Record<string, any> = {},
+): Promise<T | null> => {
   const queryString = new URLSearchParams(
-    query as Record<string, string>
+    Object.entries(query)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, String(v)]),
   ).toString();
-  const data = JSON.parse(
-    (await redisClient.get(`${key}:${queryString}`)) || "[]"
+  const data = await redisClient.get(
+    queryString ? `${key}?${queryString}` : key,
   );
-  if (Array.isArray(data) && !data.length) {
+  if (!data) {
     return null;
   }
-
-  return data;
+  return JSON.parse(data) as T;
 };
+
 export const redisDel = async (
   key: string,
-  query: Record<string, any> = {}
+  query: Record<string, any> = {},
 ) => {
   const queryString = new URLSearchParams(
-    query as Record<string, string>
+    Object.entries(query)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => [k, String(v)]),
   ).toString();
-  const redisKey = queryString ? `${key}?${queryString}` : key;
 
+  const redisKey = queryString ? `${key}?${queryString}` : key;
   return await redisClient.del(redisKey);
 };
